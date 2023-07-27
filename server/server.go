@@ -51,7 +51,7 @@ func New(listen string, tel *telemetry.Telemetry) (*Server, error) {
 }
 
 func (s *Server) Start() error {
-	log.Infow("find http server listening", "listen_addr", s.listener.Addr())
+	log.Infow("http server listening", "listenAddr", s.listener.Addr())
 	return s.server.Serve(s.listener)
 }
 

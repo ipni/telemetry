@@ -42,10 +42,10 @@ func main() {
 		updateInterval string
 		showVersion    bool
 	)
-	flag.StringVar(&listenAddr, "listenAddr", "0.0.0.0:8080", "telemetry server address:port to listen on")
+	flag.StringVar(&listenAddr, "listenAddr", "0.0.0.0:40080", "telemetry server address:port to listen on")
 	flag.StringVar(&logLevel, "logLevel", "info", "logging level applied if GOLOG_LOG_LEVEL is not set")
 	flag.IntVar(&maxDepth, "maxDepth", 5000, "advertisement chain depth limit")
-	flag.StringVar(&metricsAddr, "metricsAddr", "0.0.0.0:8081", "telemetry metrics server address:port to listen on")
+	flag.StringVar(&metricsAddr, "metricsAddr", "0.0.0.0:40081", "telemetry metrics server address:port to listen on")
 	flag.Var(&providersURLs, "providersURL", "URL to get provider infomation. Multiple OK")
 	flag.StringVar(&updateInterval, "updateIn", defaultUpdateIn, "update interval. Integr string ending in 's', 'm', or 'h'.")
 	flag.BoolVar(&showVersion, "version", false, "print version")
