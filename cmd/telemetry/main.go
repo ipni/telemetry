@@ -29,23 +29,22 @@ func (a *arrayFlags) Set(value string) error {
 }
 
 const (
-	defaultUpdateIn     = "2m"
-	defaultProvidersURL = "https://indexstar.prod.cid.contact"
+	defaultUpdateIn = "2m"
 )
 
 func main() {
 	var (
-		adDepthLimit   int
 		listenAddr     string
 		logLevel       string
+		maxDepth       int
 		metricsAddr    string
 		providersURLs  arrayFlags
 		updateInterval string
 		showVersion    bool
 	)
-	flag.IntVar(&adDepthLimit, "adl", 5000, "advertisement chain depth limit")
 	flag.StringVar(&listenAddr, "listenAddr", "0.0.0.0:8080", "telemetry server address:port to listen on")
 	flag.StringVar(&logLevel, "logLevel", "info", "logging level applied if GOLOG_LOG_LEVEL is not set")
+	flag.IntVar(&maxDepth, "maxDepth", 5000, "advertisement chain depth limit")
 	flag.StringVar(&metricsAddr, "metricsAddr", "0.0.0.0:8081", "telemetry metrics server address:port to listen on")
 	flag.Var(&providersURLs, "providersURL", "URL to get provider infomation. Multiple OK")
 	flag.StringVar(&updateInterval, "updateIn", defaultUpdateIn, "update interval. Integr string ending in 's', 'm', or 'h'.")
@@ -77,8 +76,8 @@ func main() {
 	}
 
 	if len(providersURLs) == 0 {
-		log.Info("No providers URLs configured, using %s", defaultProvidersURL)
-		providersURLs.Set(defaultProvidersURL)
+		log.Fatal("One or more providers URLs must be specified")
+		return
 	}
 	pc, err := pcache.New(pcache.WithSourceURL(providersURLs...), pcache.WithRefreshInterval(0))
 	if err != nil {
@@ -93,7 +92,7 @@ func main() {
 		return
 	}
 
-	tel := telemetry.New(int64(adDepthLimit), updateIn, pc, mets)
+	tel := telemetry.New(int64(maxDepth), updateIn, pc, mets)
 
 	svr, err := server.New(listenAddr, tel)
 	if err != nil {
