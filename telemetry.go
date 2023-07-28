@@ -73,20 +73,15 @@ func (tel *Telemetry) run(ctx context.Context) {
 		}
 
 		tel.rwmutex.Lock()
-		_, logOK := tel.dist[update.ID]
 		tel.dist[update.ID] = update.Distance
 		tel.rwmutex.Unlock()
 
 		if update.Distance == -1 {
 			tel.metrics.NotifyProviderDistance(ctx, update.ID, tel.adDepthLimit)
-			if logOK {
-				log.Infow("Distance update", "provider", update.ID, "distanceExceeds", tel.adDepthLimit)
-			}
+			log.Infow("Distance update", "provider", update.ID, "distanceExceeds", tel.adDepthLimit)
 		} else {
 			tel.metrics.NotifyProviderDistance(ctx, update.ID, int64(update.Distance))
-			if logOK {
-				log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
-			}
+			log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
 		}
 	}
 }
