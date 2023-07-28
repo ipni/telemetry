@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ipfs/go-log/v2"
 	"github.com/ipni/go-libipni/pcache"
@@ -16,6 +17,8 @@ import (
 )
 
 var logger = log.Logger("telemetry/metrics")
+
+const shutdownTimeout = 5 * time.Second
 
 type Metrics struct {
 	pcache   *pcache.ProviderCache
@@ -33,7 +36,6 @@ func New(listenAddr string, pc *pcache.ProviderCache) *Metrics {
 		pcache: pc,
 		server: &http.Server{
 			Addr: listenAddr,
-			// TODO add other metrics server options.
 		},
 	}
 }
@@ -79,11 +81,18 @@ func (m *Metrics) Start() error {
 		return err
 	}
 
-	m.server.Handler = m.serveMux()
-	go func() { _ = m.server.ListenAndServe() }()
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	m.server.Handler = mux
+
+	go func() {
+		_ = m.server.ListenAndServe()
+	}()
+
 	m.server.RegisterOnShutdown(func() {
-		// TODO add timeout to exporter shutdown
-		if err := m.exporter.Shutdown(context.TODO()); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := m.exporter.Shutdown(ctx); err != nil {
 			logger.Errorw("Failed to shut down Prometheus exporter", "err", err)
 		}
 	})
@@ -91,11 +100,6 @@ func (m *Metrics) Start() error {
 	return nil
 }
 
-func (m *Metrics) serveMux() *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	return mux
-}
 func (m *Metrics) NotifyProviderErrored(ctx context.Context, err error) {
 	errKindAttr := errKindAttribute(err)
 	m.providerErrorUpDownCounter.Add(ctx, 1, errKindAttr)
