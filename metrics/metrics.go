@@ -60,6 +60,7 @@ func (m *Metrics) Start() error {
 	}
 	if m.providerDistanceHistogram, err = meter.Int64Histogram(
 		"ipni/telemetry/provider_distance",
+		instrument.WithUnit("advertisements"),
 		instrument.WithDescription("Provider advertisement distances."),
 	); err != nil {
 		return err
