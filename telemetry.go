@@ -138,11 +138,15 @@ func (tel *Telemetry) showProviderInfo(ctx context.Context, pinfo *model.Provide
 	if pinfo.LastError != "" {
 		fmt.Fprintln(w, "    LastError:", pinfo.LastError)
 	} else {
-		dist := tel.dist[pinfo.AddrInfo.ID]
-		if dist == -1 {
-			fmt.Fprintf(w, "    Distance: exceeded limit %d+", tel.adDepthLimit)
+		dist, ok := tel.dist[pinfo.AddrInfo.ID]
+		if ok {
+			if dist == -1 {
+				fmt.Fprintf(w, "    Distance: exceeded limit %d+", tel.adDepthLimit)
+			} else {
+				fmt.Fprintln(w, "    Distance:", dist)
+			}
 		} else {
-			fmt.Fprintln(w, "    Distance:", dist)
+			fmt.Fprintf(w, "    Distance: unknown")
 		}
 	}
 	fmt.Fprintln(w)
