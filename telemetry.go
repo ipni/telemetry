@@ -22,7 +22,7 @@ type Telemetry struct {
 	cancel       context.CancelFunc
 	dist         map[peer.ID]int
 	metrics      *metrics.Metrics
-	mutex        sync.Mutex
+	rwmutex      sync.RWMutex
 	done         chan struct{}
 	pcache       *pcache.ProviderCache
 	updateIn     time.Duration
@@ -48,9 +48,9 @@ func New(adDepthLimit int64, updateIn time.Duration, pc *pcache.ProviderCache, m
 func (tel *Telemetry) Close() {
 	tel.cancel()
 	<-tel.done
-	tel.mutex.Lock()
+	tel.rwmutex.Lock()
 	tel.pcache = nil
-	tel.mutex.Unlock()
+	tel.rwmutex.Unlock()
 }
 
 func (tel *Telemetry) run(ctx context.Context) {
@@ -72,21 +72,25 @@ func (tel *Telemetry) run(ctx context.Context) {
 			delete(errored, update.ID)
 		}
 		tel.metrics.NotifyProviderDistance(ctx, update.ID, int64(update.Distance))
-		if update.Distance == -1 {
-			log.Infow("Distance update", "provider", update.ID, "distanceExceeds", tel.adDepthLimit)
-		} else {
-			log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
-		}
 
-		tel.mutex.Lock()
+		tel.rwmutex.Lock()
+		_, logOK := tel.dist[update.ID]
 		tel.dist[update.ID] = update.Distance
-		tel.mutex.Unlock()
+		tel.rwmutex.Unlock()
+
+		if logOK {
+			if update.Distance == -1 {
+				log.Infow("Distance update", "provider", update.ID, "distanceExceeds", tel.adDepthLimit)
+			} else {
+				log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
+			}
+		}
 	}
 }
 
 func (tel *Telemetry) ListProviders(ctx context.Context, w io.Writer) {
-	tel.mutex.Lock()
-	defer tel.mutex.Unlock()
+	tel.rwmutex.RLock()
+	defer tel.rwmutex.RUnlock()
 
 	if tel.pcache == nil {
 		return
@@ -99,8 +103,8 @@ func (tel *Telemetry) ListProviders(ctx context.Context, w io.Writer) {
 }
 
 func (tel *Telemetry) GetProvider(ctx context.Context, providerID peer.ID, w io.Writer) bool {
-	tel.mutex.Lock()
-	defer tel.mutex.Unlock()
+	tel.rwmutex.RLock()
+	defer tel.rwmutex.RUnlock()
 
 	if tel.pcache == nil {
 		return false
