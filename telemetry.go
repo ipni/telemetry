@@ -72,7 +72,11 @@ func (tel *Telemetry) run(ctx context.Context) {
 			delete(errored, update.ID)
 		}
 		tel.metrics.NotifyProviderDistance(ctx, update.ID, int64(update.Distance))
-		log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
+		if update.Distance == -1 {
+			log.Infow("Distance update", "provider", update.ID, "distanceExceeds", tel.adDepthLimit)
+		} else {
+			log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
+		}
 
 		tel.mutex.Lock()
 		tel.dist[update.ID] = update.Distance
@@ -130,7 +134,12 @@ func (tel *Telemetry) showProviderInfo(ctx context.Context, pinfo *model.Provide
 	if pinfo.LastError != "" {
 		fmt.Fprintln(w, "    LastError:", pinfo.LastError)
 	} else {
-		fmt.Fprintln(w, "    Distance:", tel.dist[pinfo.AddrInfo.ID])
+		dist := tel.dist[pinfo.AddrInfo.ID]
+		if dist == -1 {
+			fmt.Fprintf(w, "    Distance: exceeded limit %d+", tel.adDepthLimit)
+		} else {
+			fmt.Fprintln(w, "    Distance:", dist)
+		}
 	}
 	fmt.Fprintln(w)
 }
