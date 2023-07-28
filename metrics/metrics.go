@@ -49,10 +49,10 @@ func (m *Metrics) Start() error {
 		return err
 	}
 	provider := metric.NewMeterProvider(metric.WithReader(m.exporter))
-	meter := provider.Meter("ipni/cassette")
+	meter := provider.Meter("ipni/telemetry")
 
 	if m.distanceUpdateCounter, err = meter.Int64Counter(
-		"ipni/telemetry/udistance_pdate_count",
+		"ipni/telemetry/provider_distance_update_count",
 		instrument.WithUnit("1"),
 		instrument.WithDescription("Number of distance updates for all providers."),
 	); err != nil {
@@ -73,9 +73,9 @@ func (m *Metrics) Start() error {
 		return err
 	}
 	if m.providerCount, err = meter.Int64ObservableGauge(
-		"ipni/telemetry/providers_count",
+		"ipni/telemetry/provider_count",
 		instrument.WithUnit("1"),
-		instrument.WithDescription("The number of providers."),
+		instrument.WithDescription("Number of providers."),
 		instrument.WithInt64Callback(m.reportProviderCount),
 	); err != nil {
 		return err
