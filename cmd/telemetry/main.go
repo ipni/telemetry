@@ -29,7 +29,8 @@ func (a *arrayFlags) Set(value string) error {
 }
 
 const (
-	defaultUpdateIn = "2m"
+	defaultUpdateInterval = "2m"
+	defaultUpdateTimeout  = "5m"
 )
 
 func main() {
@@ -40,6 +41,7 @@ func main() {
 		metricsAddr    string
 		providersURLs  arrayFlags
 		updateInterval string
+		updateTimeout  string
 		showVersion    bool
 	)
 	flag.StringVar(&listenAddr, "listenAddr", "0.0.0.0:40080", "telemetry server address:port to listen on")
@@ -47,7 +49,8 @@ func main() {
 	flag.IntVar(&maxDepth, "maxDepth", 5000, "advertisement chain depth limit")
 	flag.StringVar(&metricsAddr, "metricsAddr", "0.0.0.0:40081", "telemetry metrics server address:port to listen on")
 	flag.Var(&providersURLs, "providersURL", "URL to get provider infomation. Multiple OK")
-	flag.StringVar(&updateInterval, "updateIn", defaultUpdateIn, "update interval. Integr string ending in 's', 'm', or 'h'.")
+	flag.StringVar(&updateInterval, "updateIn", defaultUpdateInterval, "update interval. Integer string ending in 's', 'm', or 'h'.")
+	flag.StringVar(&updateTimeout, "updateTimeout", defaultUpdateTimeout, "update timeout. Integer string ending in 's', 'm', or 'h'.")
 	flag.BoolVar(&showVersion, "version", false, "print version")
 	flag.Parse()
 
@@ -68,8 +71,17 @@ func main() {
 
 	updateIn, err := time.ParseDuration(updateInterval)
 	if err != nil {
-		log.Errorf("Invalid update interval %s, using default %s", updateIn, defaultUpdateIn)
-		updateIn, err = time.ParseDuration(defaultUpdateIn)
+		log.Errorf("Invalid update interval %s, using default %s", updateIn, defaultUpdateInterval)
+		updateIn, err = time.ParseDuration(defaultUpdateInterval)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	updateTo, err := time.ParseDuration(updateTimeout)
+	if err != nil {
+		log.Errorf("Invalid update timeout %s, using default %s", updateTimeout, defaultUpdateTimeout)
+		updateTo, err = time.ParseDuration(defaultUpdateTimeout)
 		if err != nil {
 			panic(err)
 		}
@@ -92,7 +104,7 @@ func main() {
 		return
 	}
 
-	tel := telemetry.New(int64(maxDepth), updateIn, pc, mets)
+	tel := telemetry.New(int64(maxDepth), updateIn, updateTo, pc, mets)
 
 	svr, err := server.New(listenAddr, tel)
 	if err != nil {
