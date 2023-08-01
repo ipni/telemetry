@@ -261,8 +261,8 @@ github.com/ipld/go-ipld-prime v0.20.0 h1:Ud3VwE9ClxpO2LkCYP7vWPc0Fo+dYdYzgxUJZ3u
 github.com/ipld/go-ipld-prime v0.20.0/go.mod h1:PzqZ/ZR981eKbgdr3y2DJYeD/8bgMawdGVlJDE8kK+M=
 github.com/ipni/go-libipni v0.3.1 h1:zCq9UXrvVL4NAxyumPGHboUAGraNfmkDC16BAoQGrww=
 github.com/ipni/go-libipni v0.3.1/go.mod h1:2zyo+mgV+E1T0n6eGmef7+uEt0awOpIhqONfz9ZPtNo=
-github.com/ipni/ipni-cli v0.0.9 h1:3/Vs/jrAvk8IQonukNE2B1VxmfFMhAttwwugMsM+scU=
-github.com/ipni/ipni-cli v0.0.9/go.mod h1:HdQO3sZ6o6IpGnHMNojbTTtGbfzKAmfcn0ljc8I+9qw=
+github.com/ipni/ipni-cli v0.0.10 h1:Mn3FOYdZYy+aYaCXJ6PjS+3RLN5DfOA+mzgQIbUTb2w=
+github.com/ipni/ipni-cli v0.0.10/go.mod h1:HdQO3sZ6o6IpGnHMNojbTTtGbfzKAmfcn0ljc8I+9qw=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jbenet/go-cienv v0.1.0/go.mod h1:TqNnHUmJgXau0nCzC7kXWeotg3J9W34CUv5Djy1+FlA=
