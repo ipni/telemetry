@@ -27,7 +27,7 @@ type Telemetry struct {
 	pcache       *pcache.ProviderCache
 }
 
-func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.ProviderCache, met *metrics.Metrics) *Telemetry {
+func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.ProviderCache, met *metrics.Metrics) (*Telemetry, error) {
 	tel := &Telemetry{
 		adDepthLimit: adDepthLimit,
 		dist:         make(map[peer.ID]int),
@@ -36,11 +36,19 @@ func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.Provid
 		pcache:       pc,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	tel.cancel = cancel
-	go tel.run(ctx, updateIn, updateTo)
+	var include, exclude map[peer.ID]struct{}
 
-	return tel
+	ctx, cancel := context.WithCancel(context.Background())
+	updates, err := dtrack.RunDistanceTracker(ctx, include, exclude, pc, adDepthLimit, updateIn, updateTo)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	tel.cancel = cancel
+
+	go tel.run(ctx, updates)
+
+	return tel, nil
 }
 
 func (tel *Telemetry) Close() {
@@ -51,13 +59,11 @@ func (tel *Telemetry) Close() {
 	tel.rwmutex.Unlock()
 }
 
-func (tel *Telemetry) run(ctx context.Context, updateIn, updateTo time.Duration) {
+func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpdate) {
 	defer close(tel.done)
 
-	var include, exclude map[peer.ID]struct{}
 	errored := make(map[peer.ID]struct{})
 
-	updates := dtrack.RunDistanceTracker(ctx, include, exclude, tel.pcache, tel.adDepthLimit, updateIn, updateTo)
 	for update := range updates {
 		if update.Err != nil {
 			tel.metrics.NotifyProviderErrored(ctx, update.Err)
