@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipni/go-libipni v0.3.1
-	github.com/ipni/ipni-cli v0.0.11
+	github.com/ipni/go-libipni v0.3.2
+	github.com/ipni/ipni-cli v0.0.13
 	github.com/libp2p/go-libp2p v0.29.0
 	github.com/prometheus/client_golang v1.14.0
 	go.opentelemetry.io/otel v1.14.0
@@ -55,7 +55,7 @@ require (
 	github.com/ipfs/go-block-format v0.1.2 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
-	github.com/ipfs/go-graphsync v0.14.6 // indirect
+	github.com/ipfs/go-graphsync v0.14.7 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
 	github.com/ipfs/go-ipld-cbor v0.0.6 // indirect
