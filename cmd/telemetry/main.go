@@ -13,6 +13,9 @@ import (
 	"github.com/ipni/telemetry"
 	"github.com/ipni/telemetry/metrics"
 	"github.com/ipni/telemetry/server"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 var log = logging.Logger("telemetry/cmd")
@@ -59,6 +62,8 @@ func main() {
 		return
 	}
 
+	go http.ListenAndServe(":8080", nil)
+
 	// Disable logging that happens in packages such as data-transfer.
 	_ = logging.SetLogLevel("*", "fatal")
 
@@ -104,7 +109,11 @@ func main() {
 		return
 	}
 
-	tel := telemetry.New(int64(maxDepth), updateIn, updateTo, pc, mets)
+	tel, err := telemetry.New(int64(maxDepth), updateIn, updateTo, pc, mets)
+	if err != nil {
+		log.Fatalw("Failed to telemetry service", "err", err)
+		return
+	}
 
 	svr, err := server.New(listenAddr, tel)
 	if err != nil {
