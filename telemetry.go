@@ -62,17 +62,19 @@ func (tel *Telemetry) Close() {
 func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpdate) {
 	defer close(tel.done)
 
-	errored := make(map[peer.ID]struct{})
+	errored := make(map[peer.ID]error)
 
 	for update := range updates {
 		if update.Err != nil {
-			tel.metrics.NotifyProviderErrored(ctx, update.Err)
 			log.Infow("Error getting distance", "provider", update.ID, "err", update.Err)
-			errored[update.ID] = struct{}{}
+			if _, ok := errored[update.ID]; !ok {
+				tel.metrics.NotifyProviderErrored(ctx, update.Err)
+				errored[update.ID] = update.Err
+			}
 			continue
 		}
-		if _, ok := errored[update.ID]; ok {
-			tel.metrics.NotifyProviderErrorCleared(ctx)
+		if err, ok := errored[update.ID]; ok {
+			tel.metrics.NotifyProviderErrorCleared(ctx, err)
 			delete(errored, update.ID)
 		}
 

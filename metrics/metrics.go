@@ -105,8 +105,9 @@ func (m *Metrics) NotifyProviderErrored(ctx context.Context, err error) {
 	m.providerErrorUpDownCounter.Add(ctx, 1, errKindAttr)
 }
 
-func (m *Metrics) NotifyProviderErrorCleared(ctx context.Context) {
-	m.providerErrorUpDownCounter.Add(ctx, -1)
+func (m *Metrics) NotifyProviderErrorCleared(ctx context.Context, err error) {
+	errKindAttr := errKindAttribute(err)
+	m.providerErrorUpDownCounter.Add(ctx, -1, errKindAttr)
 }
 
 func (m *Metrics) NotifyProviderDistance(ctx context.Context, peerID peer.ID, distance int64) {
