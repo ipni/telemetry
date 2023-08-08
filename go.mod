@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipni/go-libipni v0.3.2
-	github.com/ipni/ipni-cli v0.0.13
-	github.com/libp2p/go-libp2p v0.29.0
+	github.com/ipni/go-libipni v0.3.5-0.20230808091853-1e8a2ebeb928
+	github.com/ipni/ipni-cli v0.0.13-0.20230808204011-6239e9d0ce4f
+	github.com/libp2p/go-libp2p v0.29.1
 	github.com/prometheus/client_golang v1.14.0
 	go.opentelemetry.io/otel v1.14.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.37.0
@@ -114,9 +114,9 @@ require (
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
-	github.com/quic-go/qtls-go1-20 v0.2.2 // indirect
-	github.com/quic-go/quic-go v0.36.2 // indirect
+	github.com/quic-go/qtls-go1-19 v0.3.3 // indirect
+	github.com/quic-go/qtls-go1-20 v0.2.3 // indirect
+	github.com/quic-go/quic-go v0.36.3 // indirect
 	github.com/quic-go/webtransport-go v0.5.3 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
