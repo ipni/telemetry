@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipni/go-libipni v0.3.5-0.20230808205428-efcc1024593a
-	github.com/ipni/ipni-cli v0.0.13-0.20230808205748-8b1a52e563e9
+	github.com/ipni/go-libipni v0.4.0
+	github.com/ipni/ipni-cli v0.0.14
 	github.com/libp2p/go-libp2p v0.29.2
 	github.com/prometheus/client_golang v1.14.0
 	go.opentelemetry.io/otel v1.14.0
