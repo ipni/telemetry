@@ -259,10 +259,10 @@ github.com/ipld/go-codec-dagpb v1.6.0 h1:9nYazfyu9B1p3NAgfVdpRco3Fs2nFC72DqVsMj6
 github.com/ipld/go-codec-dagpb v1.6.0/go.mod h1:ANzFhfP2uMJxRBr8CE+WQWs5UsNa0pYtmKZ+agnUw9s=
 github.com/ipld/go-ipld-prime v0.20.0 h1:Ud3VwE9ClxpO2LkCYP7vWPc0Fo+dYdYzgxUJZ3uRG4g=
 github.com/ipld/go-ipld-prime v0.20.0/go.mod h1:PzqZ/ZR981eKbgdr3y2DJYeD/8bgMawdGVlJDE8kK+M=
-github.com/ipni/go-libipni v0.3.5-0.20230808205428-efcc1024593a h1:UQa8TnABIjEDv/1aRg5xmyfC5lmi9gvMJXaQeJIdTVw=
-github.com/ipni/go-libipni v0.3.5-0.20230808205428-efcc1024593a/go.mod h1:LxH6NUmEVruK3FjV2bFWfXKougX7AIe7wVjvPqITrDI=
-github.com/ipni/ipni-cli v0.0.13-0.20230808205748-8b1a52e563e9 h1:4RfcQC0x1W1CGVl+AW23vj0y7u/YSeFjak9Q6hTR+wk=
-github.com/ipni/ipni-cli v0.0.13-0.20230808205748-8b1a52e563e9/go.mod h1:Wl6xFtan0BBTV88+/5c0wOW12EvSjmHlmY1GJ+SnnS0=
+github.com/ipni/go-libipni v0.4.0 h1:zZ8OU2N0D4iYt0E9jInbDapeh9bG10b5sBgqvScflNw=
+github.com/ipni/go-libipni v0.4.0/go.mod h1:LxH6NUmEVruK3FjV2bFWfXKougX7AIe7wVjvPqITrDI=
+github.com/ipni/ipni-cli v0.0.14 h1:yijRooD8mdxWmEnl0SzKZfCmlE8IdOIlfFhsKZ3jzZ8=
+github.com/ipni/ipni-cli v0.0.14/go.mod h1:d4OEXc3qAaOj5ZCxlWb9MGjunmbtM9a26mAPH0PyHkI=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jbenet/go-cienv v0.1.0/go.mod h1:TqNnHUmJgXau0nCzC7kXWeotg3J9W34CUv5Djy1+FlA=
