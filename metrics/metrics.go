@@ -2,8 +2,10 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-log/v2"
@@ -12,7 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/prometheus"
-	"go.opentelemetry.io/otel/metric/instrument"
+	api "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 )
 
@@ -20,15 +22,35 @@ var logger = log.Logger("telemetry/metrics")
 
 const shutdownTimeout = 5 * time.Second
 
+type IngestRate struct {
+	AvgMhPerAd int64
+	MhPerSec   int64
+	ProviderID peer.ID
+}
+
+type SortableRates []*IngestRate
+
+func (r SortableRates) Len() int           { return len(r) }
+func (r SortableRates) Less(i, j int) bool { return r[i].MhPerSec < r[j].MhPerSec }
+func (r SortableRates) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+
 type Metrics struct {
 	pcache   *pcache.ProviderCache
 	server   *http.Server
 	exporter *prometheus.Exporter
 
-	distanceUpdateCounter      instrument.Int64Counter
-	providerDistanceHistogram  instrument.Int64Histogram
-	providerErrorUpDownCounter instrument.Int64UpDownCounter
-	providerCount              instrument.Int64ObservableGauge
+	avgMhPerSec int64
+	slowRates   []*IngestRate
+	slowCount   int
+	ratesMutex  sync.Mutex
+
+	distanceUpdateCounter      api.Int64Counter
+	providerDistanceHistogram  api.Int64Histogram
+	providerErrorUpDownCounter api.Int64UpDownCounter
+	providerCount              api.Int64ObservableGauge
+	providerAvgIngestRate      api.Int64ObservableGauge
+	providerSlowCount          api.Int64ObservableGauge
+	providerSlowIngestRate     api.Int64ObservableGauge
 }
 
 func New(listenAddr string, pc *pcache.ProviderCache) *Metrics {
@@ -40,7 +62,7 @@ func New(listenAddr string, pc *pcache.ProviderCache) *Metrics {
 	}
 }
 
-func (m *Metrics) Start() error {
+func (m *Metrics) Start(slowRate, nSlowest int) error {
 	var err error
 	if m.exporter, err = prometheus.New(
 		prometheus.WithoutUnits(),
@@ -49,34 +71,58 @@ func (m *Metrics) Start() error {
 		return err
 	}
 	provider := metric.NewMeterProvider(metric.WithReader(m.exporter))
-	meter := provider.Meter("ipni/telemetry")
+	meter := provider.Meter("ipni-telemetry")
 
 	if m.distanceUpdateCounter, err = meter.Int64Counter(
-		"ipni/telemetry/provider_distance_update_count",
-		instrument.WithUnit("1"),
-		instrument.WithDescription("Number of distance updates for all providers."),
+		"provider_distance_update_count",
+		api.WithUnit("1"),
+		api.WithDescription("Number of distance updates for all providers."),
 	); err != nil {
 		return err
 	}
 	if m.providerDistanceHistogram, err = meter.Int64Histogram(
-		"ipni/telemetry/provider_distance",
-		instrument.WithUnit("advertisements"),
-		instrument.WithDescription("Provider advertisement distances."),
+		"provider_distance",
+		api.WithUnit("advertisements"),
+		api.WithDescription("Provider advertisement distances."),
 	); err != nil {
 		return err
 	}
 	if m.providerErrorUpDownCounter, err = meter.Int64UpDownCounter(
-		"ipni/telemetry/provider_error_count",
-		instrument.WithUnit("1"),
-		instrument.WithDescription("Number of providers with ingestion errors."),
+		"provider_error_count",
+		api.WithUnit("1"),
+		api.WithDescription("Number of providers with ingestion errors."),
 	); err != nil {
 		return err
 	}
 	if m.providerCount, err = meter.Int64ObservableGauge(
-		"ipni/telemetry/provider_count",
-		instrument.WithUnit("1"),
-		instrument.WithDescription("Number of providers."),
-		instrument.WithInt64Callback(m.reportProviderCount),
+		"provider_count",
+		api.WithUnit("1"),
+		api.WithDescription("Number of providers."),
+		api.WithInt64Callback(m.reportProviderCount),
+	); err != nil {
+		return err
+	}
+	if m.providerAvgIngestRate, err = meter.Int64ObservableGauge(
+		"provider_avg_ingest_rate",
+		api.WithUnit("mh/sec"),
+		api.WithDescription("Average ingest rate for all non-error providers"),
+		api.WithInt64Callback(m.reportProviderAvgIngestRate),
+	); err != nil {
+		return err
+	}
+	if m.providerSlowCount, err = meter.Int64ObservableGauge(
+		"provider_slow_count",
+		api.WithUnit("1"),
+		api.WithDescription(fmt.Sprintf("Number of providers with slow ingestion rate (below %d mh/sec)", slowRate)),
+		api.WithInt64Callback(m.reportProviderSlowCount),
+	); err != nil {
+		return err
+	}
+	if m.providerSlowIngestRate, err = meter.Int64ObservableGauge(
+		"provider_slow_ingest_rate",
+		api.WithUnit("mh/sec"),
+		api.WithDescription(fmt.Sprintf("%d Slowest Provider Ingestion Rates", nSlowest)),
+		api.WithInt64Callback(m.reportProviderSlowIngestRates),
 	); err != nil {
 		return err
 	}
@@ -102,23 +148,63 @@ func (m *Metrics) Start() error {
 
 func (m *Metrics) NotifyProviderErrored(ctx context.Context, err error) {
 	errKindAttr := errKindAttribute(err)
-	m.providerErrorUpDownCounter.Add(ctx, 1, errKindAttr)
+	m.providerErrorUpDownCounter.Add(ctx, 1, api.WithAttributes(errKindAttr))
 }
 
 func (m *Metrics) NotifyProviderErrorCleared(ctx context.Context, err error) {
 	errKindAttr := errKindAttribute(err)
-	m.providerErrorUpDownCounter.Add(ctx, -1, errKindAttr)
+	m.providerErrorUpDownCounter.Add(ctx, -1, api.WithAttributes(errKindAttr))
 }
 
 func (m *Metrics) NotifyProviderDistance(ctx context.Context, peerID peer.ID, distance int64) {
-	pidAttr := attribute.String("provider-id", peerID.String())
-	m.distanceUpdateCounter.Add(ctx, 1, pidAttr)
-	m.providerDistanceHistogram.Record(ctx, distance, pidAttr)
+	pidAttr := providerAttr(peerID)
+	m.distanceUpdateCounter.Add(ctx, 1, api.WithAttributes(pidAttr))
+	m.providerDistanceHistogram.Record(ctx, distance, api.WithAttributes(pidAttr))
 }
 
-func (m *Metrics) reportProviderCount(_ context.Context, observer instrument.Int64Observer) error {
+func (m *Metrics) UpdateIngestRates(slowRates []*IngestRate, slowCount int, avgMhPerSec int64) {
+	ratesCopy := make([]*IngestRate, len(slowRates))
+	copy(ratesCopy, slowRates)
+
+	m.ratesMutex.Lock()
+	defer m.ratesMutex.Unlock()
+
+	m.slowRates = ratesCopy
+	m.slowCount = slowCount
+	m.avgMhPerSec = avgMhPerSec
+}
+
+func (m *Metrics) reportProviderCount(_ context.Context, observer api.Int64Observer) error {
 	observer.Observe(int64(m.pcache.Len()))
 	return nil
+}
+
+func (m *Metrics) reportProviderAvgIngestRate(_ context.Context, observer api.Int64Observer) error {
+	m.ratesMutex.Lock()
+	defer m.ratesMutex.Unlock()
+	observer.Observe(m.avgMhPerSec)
+	return nil
+}
+
+func (m *Metrics) reportProviderSlowCount(_ context.Context, observer api.Int64Observer) error {
+	m.ratesMutex.Lock()
+	defer m.ratesMutex.Unlock()
+	observer.Observe(int64(m.slowCount))
+	return nil
+}
+
+func (m *Metrics) reportProviderSlowIngestRates(_ context.Context, observer api.Int64Observer) error {
+	m.ratesMutex.Lock()
+	defer m.ratesMutex.Unlock()
+	for _, provRate := range m.slowRates {
+		pidAttr := providerAttr(provRate.ProviderID)
+		observer.Observe(provRate.MhPerSec, api.WithAttributes(pidAttr))
+	}
+	return nil
+}
+
+func providerAttr(providerID peer.ID) attribute.KeyValue {
+	return attribute.Key("provider-id").String(providerID.String())
 }
 
 func errKindAttribute(err error) attribute.KeyValue {
@@ -136,7 +222,7 @@ func errKindAttribute(err error) attribute.KeyValue {
 	default:
 		errKind = "other"
 	}
-	return attribute.String("error-kind", errKind)
+	return attribute.Key("error-kind").String(errKind)
 }
 
 func (m *Metrics) Shutdown() error {
