@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - get-rates-from-indexers
 
 jobs:
   publisher:
