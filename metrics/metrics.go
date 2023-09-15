@@ -137,7 +137,7 @@ func (m *Metrics) Start(slowRate, nSlowest int) error {
 	); err != nil {
 		return err
 	}
-	if m.providerLargeDist, err = meter.Int64ObservableGauge(
+	if m.providerTotalDist, err = meter.Int64ObservableGauge(
 		namePrefix+"provider_total_distance",
 		api.WithUnit("1"),
 		api.WithDescription("Total distance for all non-error providers"),
