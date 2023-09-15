@@ -25,7 +25,7 @@ const nbuckets = 3
 type Telemetry struct {
 	adDepthLimit int64
 	cancel       context.CancelFunc
-	dist         map[peer.ID]int
+	dist         map[peer.ID]int64
 	metrics      *metrics.Metrics
 	rwmutex      sync.RWMutex
 	done         chan struct{}
@@ -51,7 +51,7 @@ func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.Provid
 
 	tel := &Telemetry{
 		adDepthLimit: adDepthLimit,
-		dist:         make(map[peer.ID]int),
+		dist:         map[peer.ID]int64{},
 		done:         make(chan struct{}),
 		metrics:      met,
 		pcache:       pc,
@@ -93,6 +93,7 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 
 	errored := make(map[peer.ID]error)
 	rateMap := map[peer.ID]*metrics.IngestRate{}
+	var distSum int64
 
 	for update := range updates {
 		if update.Err != nil {
@@ -106,17 +107,13 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 					tel.updateIngestRates(rateMap)
 				}
 			}
+			distSum = tel.removeProviderFromDistBucket(ctx, update.ID, distSum)
 		} else {
 			if err, ok := errored[update.ID]; ok {
 				tel.metrics.NotifyProviderErrorCleared(ctx, err)
 				delete(errored, update.ID)
 			}
-
-			tel.rwmutex.Lock()
-			tel.dist[update.ID] = update.Distance
-			tel.rwmutex.Unlock()
-
-			tel.updateDistBuckets(ctx, update.ID, int64(update.Distance))
+			distSum = tel.updateDistBuckets(ctx, update.ID, int64(update.Distance), distSum)
 		}
 
 		// Get latest ingestion rate from indexer.
@@ -140,7 +137,7 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 	}
 }
 
-func (tel *Telemetry) updateDistBuckets(ctx context.Context, peerID peer.ID, distance int64) {
+func (tel *Telemetry) updateDistBuckets(ctx context.Context, peerID peer.ID, distance, distSum int64) int64 {
 	if distance == -1 {
 		log.Infow("Distance update", "provider", peerID, "distanceExceeds", tel.adDepthLimit)
 		distance = tel.adDepthLimit
@@ -160,7 +157,35 @@ func (tel *Telemetry) updateDistBuckets(ctx context.Context, peerID peer.ID, dis
 	tel.distBuckets[bucketIndex]++
 	tel.bucketIndexes[peerID] = bucketIndex
 
-	tel.metrics.UpdateProviderDistanceBuckets(ctx, tel.distBuckets[0], tel.distBuckets[1], tel.distBuckets[2])
+	tel.rwmutex.Lock()
+	prevDist := tel.dist[peerID]
+	if prevDist != distance {
+		tel.dist[peerID] = distance
+		distSum += distance - prevDist
+	}
+	tel.rwmutex.Unlock()
+
+	tel.metrics.UpdateProviderDistanceBuckets(ctx, tel.distBuckets[0], tel.distBuckets[1], tel.distBuckets[2], distSum)
+	return distSum
+}
+
+func (tel *Telemetry) removeProviderFromDistBucket(ctx context.Context, peerID peer.ID, distSum int64) int64 {
+	bucketIndex, ok := tel.bucketIndexes[peerID]
+	if ok {
+		tel.distBuckets[bucketIndex]--
+		delete(tel.bucketIndexes, peerID)
+	}
+
+	tel.rwmutex.Lock()
+	prevDist, ok := tel.dist[peerID]
+	if ok {
+		distSum -= prevDist
+		delete(tel.dist, peerID)
+	}
+	tel.rwmutex.Unlock()
+
+	tel.metrics.UpdateProviderDistanceBuckets(ctx, tel.distBuckets[0], tel.distBuckets[1], tel.distBuckets[2], distSum)
+	return distSum
 }
 
 func (tel *Telemetry) updateIngestRates(rateMap map[peer.ID]*metrics.IngestRate) {

@@ -42,6 +42,7 @@ type Metrics struct {
 	smallDist  int64
 	mediumDist int64
 	largeDist  int64
+	totalDist  int64
 
 	avgMhPerSec     int64
 	fastestMhPerSec int64
@@ -58,6 +59,7 @@ type Metrics struct {
 	providerSmallDist  api.Int64ObservableGauge
 	providerMediumDist api.Int64ObservableGauge
 	providerLargeDist  api.Int64ObservableGauge
+	providerTotalDist  api.Int64ObservableGauge
 
 	providerAvgIngestRate     api.Int64ObservableGauge
 	providerFastestIngestRate api.Int64ObservableGauge
@@ -135,6 +137,14 @@ func (m *Metrics) Start(slowRate, nSlowest int) error {
 	); err != nil {
 		return err
 	}
+	if m.providerLargeDist, err = meter.Int64ObservableGauge(
+		namePrefix+"provider_total_distance",
+		api.WithUnit("1"),
+		api.WithDescription("Total distance for all non-error providers"),
+		api.WithInt64Callback(m.reportProviderTotalDist),
+	); err != nil {
+		return err
+	}
 
 	if m.providerAvgIngestRate, err = meter.Int64ObservableGauge(
 		namePrefix+"provider_avg_ingest_rate",
@@ -207,10 +217,11 @@ func (m *Metrics) NotifyProviderErrorCleared(ctx context.Context, err error) {
 	m.providerErrorUpDownCounter.Add(ctx, -1, api.WithAttributes(errKindAttr))
 }
 
-func (m *Metrics) UpdateProviderDistanceBuckets(ctx context.Context, small, medium, large int64) {
+func (m *Metrics) UpdateProviderDistanceBuckets(ctx context.Context, small, medium, large, totalDist int64) {
 	m.smallDist = small
 	m.mediumDist = medium
 	m.largeDist = large
+	m.totalDist = totalDist
 }
 
 func (m *Metrics) UpdateIngestRates(slowRates []*IngestRate, slowCount int, avg, fastest, slowest int64) {
@@ -244,6 +255,11 @@ func (m *Metrics) reportProviderMediumDist(_ context.Context, observer api.Int64
 
 func (m *Metrics) reportProviderLargeDist(_ context.Context, observer api.Int64Observer) error {
 	observer.Observe(m.largeDist)
+	return nil
+}
+
+func (m *Metrics) reportProviderTotalDist(_ context.Context, observer api.Int64Observer) error {
+	observer.Observe(m.totalDist)
 	return nil
 }
 
