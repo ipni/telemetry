@@ -38,23 +38,31 @@ const (
 
 func main() {
 	var (
+		indexerURLs    arrayFlags
 		listenAddr     string
 		logLevel       string
 		maxDepth       int
 		metricsAddr    string
+		nSlowest       int
 		providersURLs  arrayFlags
 		updateInterval string
 		updateTimeout  string
 		showVersion    bool
+		slowRate       int
+		topic          string
 	)
+	flag.Var(&indexerURLs, "indexerURL", "indexer admin URL to get ingestion rate from. Multiple OK")
 	flag.StringVar(&listenAddr, "listenAddr", "0.0.0.0:40080", "telemetry server address:port to listen on")
 	flag.StringVar(&logLevel, "logLevel", "info", "logging level applied if GOLOG_LOG_LEVEL is not set")
 	flag.IntVar(&maxDepth, "maxDepth", 5000, "advertisement chain depth limit")
 	flag.StringVar(&metricsAddr, "metricsAddr", "0.0.0.0:40081", "telemetry metrics server address:port to listen on")
+	flag.IntVar(&slowRate, "slowRate", 250, "rate at which ingestion is considered slow in mh/sec (default 250)")
+	flag.IntVar(&nSlowest, "nSlowest", 10, "number of slowest indexers to track ingestion rates for")
 	flag.Var(&providersURLs, "providersURL", "URL to get provider infomation. Multiple OK")
 	flag.StringVar(&updateInterval, "updateIn", defaultUpdateInterval, "update interval. Integer string ending in 's', 'm', or 'h'.")
 	flag.StringVar(&updateTimeout, "updateTimeout", defaultUpdateTimeout, "update timeout. Integer string ending in 's', 'm', or 'h'.")
 	flag.BoolVar(&showVersion, "version", false, "print version")
+	flag.StringVar(&topic, "topic", "", "topic used to fetch head advertisement with graphsync, specify only if using non-standard topic")
 	flag.Parse()
 
 	if showVersion {
@@ -72,6 +80,11 @@ func main() {
 		_ = logging.SetLogLevel("telemetry/cmd", logLevel)
 		_ = logging.SetLogLevel("telemetry/metrics", logLevel)
 		_ = logging.SetLogLevel("telemetry/server", logLevel)
+	}
+
+	if len(indexerURLs) == 0 {
+		log.Fatal("One or more indexer admin URLs must be specified")
+		return
 	}
 
 	updateIn, err := time.ParseDuration(updateInterval)
@@ -103,13 +116,13 @@ func main() {
 	}
 
 	mets := metrics.New(metricsAddr, pc)
-	err = mets.Start()
+	err = mets.Start(slowRate, nSlowest)
 	if err != nil {
 		log.Fatalw("Failed to start metrics server", "err", err)
 		return
 	}
 
-	tel, err := telemetry.New(int64(maxDepth), updateIn, updateTo, pc, mets)
+	tel, err := telemetry.New(int64(maxDepth), updateIn, updateTo, pc, mets, indexerURLs, slowRate, nSlowest, topic)
 	if err != nil {
 		log.Fatalw("Failed to telemetry service", "err", err)
 		return
