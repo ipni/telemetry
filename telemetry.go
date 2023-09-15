@@ -19,6 +19,9 @@ import (
 
 var log = logging.Logger("telemetry")
 
+// Number of buckest is 3: small, medium, large
+const nbuckets = 3
+
 type Telemetry struct {
 	adDepthLimit int64
 	cancel       context.CancelFunc
@@ -31,6 +34,9 @@ type Telemetry struct {
 	indexerURLs []*url.URL
 	nSlowest    int
 	slowRate    int64
+
+	distBuckets   []int64
+	bucketIndexes map[peer.ID]int
 }
 
 func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.ProviderCache, met *metrics.Metrics, indexerAdminURLs []string, slowRate, nSlowest int, topic string) (*Telemetry, error) {
@@ -53,6 +59,9 @@ func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.Provid
 		indexerURLs: indexerURLs,
 		nSlowest:    nSlowest,
 		slowRate:    int64(slowRate),
+
+		distBuckets:   make([]int64, 3),
+		bucketIndexes: map[peer.ID]int{},
 	}
 
 	var include, exclude map[peer.ID]struct{}
@@ -107,13 +116,7 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 			tel.dist[update.ID] = update.Distance
 			tel.rwmutex.Unlock()
 
-			if update.Distance == -1 {
-				tel.metrics.NotifyProviderDistance(ctx, update.ID, tel.adDepthLimit)
-				log.Infow("Distance update", "provider", update.ID, "distanceExceeds", tel.adDepthLimit)
-			} else {
-				tel.metrics.NotifyProviderDistance(ctx, update.ID, int64(update.Distance))
-				log.Infow("Distance update", "provider", update.ID, "distance", update.Distance)
-			}
+			tel.updateDistBuckets(ctx, update.ID, int64(update.Distance))
 		}
 
 		// Get latest ingestion rate from indexer.
@@ -137,6 +140,29 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 	}
 }
 
+func (tel *Telemetry) updateDistBuckets(ctx context.Context, peerID peer.ID, distance int64) {
+	if distance == -1 {
+		log.Infow("Distance update", "provider", peerID, "distanceExceeds", tel.adDepthLimit)
+		distance = tel.adDepthLimit
+	} else {
+		log.Infow("Distance update", "provider", peerID, "distance", distance)
+	}
+
+	bucketIndex, ok := tel.bucketIndexes[peerID]
+	if ok {
+		tel.distBuckets[bucketIndex]--
+	}
+	// bucketIndex = distance / bucketSize
+	bucketIndex = int(distance * nbuckets / tel.adDepthLimit)
+	if bucketIndex >= len(tel.distBuckets) {
+		bucketIndex = len(tel.distBuckets) - 1
+	}
+	tel.distBuckets[bucketIndex]++
+	tel.bucketIndexes[peerID] = bucketIndex
+
+	tel.metrics.UpdateProviderDistanceBuckets(ctx, tel.distBuckets[0], tel.distBuckets[1], tel.distBuckets[2])
+}
+
 func (tel *Telemetry) updateIngestRates(rateMap map[peer.ID]*metrics.IngestRate) {
 	rates := make([]*metrics.IngestRate, len(rateMap))
 	var i, slowCount int
@@ -144,10 +170,11 @@ func (tel *Telemetry) updateIngestRates(rateMap map[peer.ID]*metrics.IngestRate)
 	for _, ingestRate := range rateMap {
 		rates[i] = ingestRate
 		i++
-		if ingestRate.MhPerSec <= tel.slowRate {
+		mhPerSec := ingestRate.MhPerSec
+		if mhPerSec <= tel.slowRate {
 			slowCount++
 		}
-		totalMhPerSec += ingestRate.MhPerSec
+		totalMhPerSec += mhPerSec
 	}
 
 	sort.Sort(metrics.SortableRates(rates))
@@ -159,16 +186,18 @@ func (tel *Telemetry) updateIngestRates(rateMap map[peer.ID]*metrics.IngestRate)
 		slowest = rates
 	}
 	log.Infof("Slow providers (below %d mh/sec): %d", tel.slowRate, slowCount)
-	var avgMhPerSec int64
+	var avgMhPerSec, fastestMhPerSec, slowestMhPerSec int64
 	if len(rates) != 0 {
 		r := rates[len(rates)-1]
+		fastestMhPerSec = r.MhPerSec
 		log.Infow("Fastest", "provider", r.ProviderID, "mh/sec", r.MhPerSec, "avgMhPerAd", r.AvgMhPerAd)
 		r = rates[0]
+		slowestMhPerSec = r.MhPerSec
 		log.Infow("Slowest", "provider", r.ProviderID, "mh/sec", r.MhPerSec, "avgMhPerAd", r.AvgMhPerAd)
 		avgMhPerSec = totalMhPerSec / int64(len(rateMap))
 		log.Infof("Average ingest rate: %d mh/sec", avgMhPerSec)
 	}
-	tel.metrics.UpdateIngestRates(slowest, slowCount, avgMhPerSec)
+	tel.metrics.UpdateIngestRates(slowest, slowCount, avgMhPerSec, fastestMhPerSec, slowestMhPerSec)
 }
 
 func (tel *Telemetry) ListProviders(ctx context.Context, w io.Writer) {

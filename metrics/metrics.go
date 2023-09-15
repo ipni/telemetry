@@ -39,18 +39,31 @@ type Metrics struct {
 	server   *http.Server
 	exporter *prometheus.Exporter
 
-	avgMhPerSec int64
-	slowRates   []*IngestRate
-	slowCount   int
-	ratesMutex  sync.Mutex
+	smallDist  int64
+	mediumDist int64
+	largeDist  int64
+
+	avgMhPerSec     int64
+	fastestMhPerSec int64
+	slowestMhPerSec int64
+
+	slowRates  []*IngestRate
+	slowCount  int
+	ratesMutex sync.Mutex
 
 	distanceUpdateCounter      api.Int64Counter
-	providerDistanceHistogram  api.Int64Histogram
-	providerErrorUpDownCounter api.Int64UpDownCounter
 	providerCount              api.Int64ObservableGauge
-	providerAvgIngestRate      api.Int64ObservableGauge
-	providerSlowCount          api.Int64ObservableGauge
-	providerSlowIngestRate     api.Int64ObservableGauge
+	providerErrorUpDownCounter api.Int64UpDownCounter
+
+	providerSmallDist  api.Int64ObservableGauge
+	providerMediumDist api.Int64ObservableGauge
+	providerLargeDist  api.Int64ObservableGauge
+
+	providerAvgIngestRate     api.Int64ObservableGauge
+	providerFastestIngestRate api.Int64ObservableGauge
+	providerSlowestIngestRate api.Int64ObservableGauge
+	providerSlowCount         api.Int64ObservableGauge
+	providerSlowIngestRate    api.Int64ObservableGauge
 }
 
 func New(listenAddr string, pc *pcache.ProviderCache) *Metrics {
@@ -63,6 +76,8 @@ func New(listenAddr string, pc *pcache.ProviderCache) *Metrics {
 }
 
 func (m *Metrics) Start(slowRate, nSlowest int) error {
+	const namePrefix = "ipni_telemetry_"
+
 	var err error
 	if m.exporter, err = prometheus.New(
 		prometheus.WithoutUnits(),
@@ -74,44 +89,80 @@ func (m *Metrics) Start(slowRate, nSlowest int) error {
 	meter := provider.Meter("ipni-telemetry")
 
 	if m.distanceUpdateCounter, err = meter.Int64Counter(
-		"provider_distance_update_count",
+		namePrefix+"provider_distance_update_count",
 		api.WithUnit("1"),
 		api.WithDescription("Number of distance updates for all providers."),
 	); err != nil {
 		return err
 	}
-	if m.providerDistanceHistogram, err = meter.Int64Histogram(
-		"provider_distance",
-		api.WithUnit("advertisements"),
-		api.WithDescription("Provider advertisement distances."),
-	); err != nil {
-		return err
-	}
 	if m.providerErrorUpDownCounter, err = meter.Int64UpDownCounter(
-		"provider_error_count",
+		namePrefix+"provider_error_count",
 		api.WithUnit("1"),
-		api.WithDescription("Number of providers with ingestion errors."),
+		api.WithDescription("Number of providers with ingestion errors"),
 	); err != nil {
 		return err
 	}
 	if m.providerCount, err = meter.Int64ObservableGauge(
-		"provider_count",
+		namePrefix+"provider_count",
 		api.WithUnit("1"),
 		api.WithDescription("Number of providers."),
 		api.WithInt64Callback(m.reportProviderCount),
 	); err != nil {
 		return err
 	}
+
+	if m.providerSmallDist, err = meter.Int64ObservableGauge(
+		namePrefix+"provider_small_distance",
+		api.WithUnit("1"),
+		api.WithDescription("Number of providers with small distance (less than 33% max)"),
+		api.WithInt64Callback(m.reportProviderSmallDist),
+	); err != nil {
+		return err
+	}
+	if m.providerMediumDist, err = meter.Int64ObservableGauge(
+		namePrefix+"provider_medium_distance",
+		api.WithUnit("1"),
+		api.WithDescription("Number of providers with medium distance (33% to 66% max)"),
+		api.WithInt64Callback(m.reportProviderMediumDist),
+	); err != nil {
+		return err
+	}
+	if m.providerLargeDist, err = meter.Int64ObservableGauge(
+		namePrefix+"provider_large_distance",
+		api.WithUnit("1"),
+		api.WithDescription("Number of providers with large distance (greater then 66% max)"),
+		api.WithInt64Callback(m.reportProviderLargeDist),
+	); err != nil {
+		return err
+	}
+
 	if m.providerAvgIngestRate, err = meter.Int64ObservableGauge(
-		"provider_avg_ingest_rate",
+		namePrefix+"provider_avg_ingest_rate",
 		api.WithUnit("mh/sec"),
 		api.WithDescription("Average ingest rate for all non-error providers"),
 		api.WithInt64Callback(m.reportProviderAvgIngestRate),
 	); err != nil {
 		return err
 	}
+	if m.providerFastestIngestRate, err = meter.Int64ObservableGauge(
+		namePrefix+"provider_fastest_ingest_rate",
+		api.WithUnit("mh/sec"),
+		api.WithDescription("Fastest ingest rate"),
+		api.WithInt64Callback(m.reportProviderFastestIngestRate),
+	); err != nil {
+		return err
+	}
+	if m.providerAvgIngestRate, err = meter.Int64ObservableGauge(
+		namePrefix+"provider_slowest_ingest_rate",
+		api.WithUnit("mh/sec"),
+		api.WithDescription("Slowest non-zero ingest rate"),
+		api.WithInt64Callback(m.reportProviderSlowestIngestRate),
+	); err != nil {
+		return err
+	}
+
 	if m.providerSlowCount, err = meter.Int64ObservableGauge(
-		"provider_slow_count",
+		namePrefix+"provider_slow_count",
 		api.WithUnit("1"),
 		api.WithDescription(fmt.Sprintf("Number of providers with slow ingestion rate (below %d mh/sec)", slowRate)),
 		api.WithInt64Callback(m.reportProviderSlowCount),
@@ -119,7 +170,7 @@ func (m *Metrics) Start(slowRate, nSlowest int) error {
 		return err
 	}
 	if m.providerSlowIngestRate, err = meter.Int64ObservableGauge(
-		"provider_slow_ingest_rate",
+		namePrefix+"provider_slow_ingest_rate",
 		api.WithUnit("mh/sec"),
 		api.WithDescription(fmt.Sprintf("%d Slowest Provider Ingestion Rates", nSlowest)),
 		api.WithInt64Callback(m.reportProviderSlowIngestRates),
@@ -156,13 +207,13 @@ func (m *Metrics) NotifyProviderErrorCleared(ctx context.Context, err error) {
 	m.providerErrorUpDownCounter.Add(ctx, -1, api.WithAttributes(errKindAttr))
 }
 
-func (m *Metrics) NotifyProviderDistance(ctx context.Context, peerID peer.ID, distance int64) {
-	pidAttr := providerAttr(peerID)
-	m.distanceUpdateCounter.Add(ctx, 1, api.WithAttributes(pidAttr))
-	m.providerDistanceHistogram.Record(ctx, distance, api.WithAttributes(pidAttr))
+func (m *Metrics) UpdateProviderDistanceBuckets(ctx context.Context, small, medium, large int64) {
+	m.smallDist = small
+	m.mediumDist = medium
+	m.largeDist = large
 }
 
-func (m *Metrics) UpdateIngestRates(slowRates []*IngestRate, slowCount int, avgMhPerSec int64) {
+func (m *Metrics) UpdateIngestRates(slowRates []*IngestRate, slowCount int, avg, fastest, slowest int64) {
 	ratesCopy := make([]*IngestRate, len(slowRates))
 	copy(ratesCopy, slowRates)
 
@@ -171,7 +222,9 @@ func (m *Metrics) UpdateIngestRates(slowRates []*IngestRate, slowCount int, avgM
 
 	m.slowRates = ratesCopy
 	m.slowCount = slowCount
-	m.avgMhPerSec = avgMhPerSec
+	m.avgMhPerSec = avg
+	m.fastestMhPerSec = fastest
+	m.slowestMhPerSec = slowest
 }
 
 func (m *Metrics) reportProviderCount(_ context.Context, observer api.Int64Observer) error {
@@ -179,10 +232,39 @@ func (m *Metrics) reportProviderCount(_ context.Context, observer api.Int64Obser
 	return nil
 }
 
+func (m *Metrics) reportProviderSmallDist(_ context.Context, observer api.Int64Observer) error {
+	observer.Observe(m.smallDist)
+	return nil
+}
+
+func (m *Metrics) reportProviderMediumDist(_ context.Context, observer api.Int64Observer) error {
+	observer.Observe(m.mediumDist)
+	return nil
+}
+
+func (m *Metrics) reportProviderLargeDist(_ context.Context, observer api.Int64Observer) error {
+	observer.Observe(m.largeDist)
+	return nil
+}
+
 func (m *Metrics) reportProviderAvgIngestRate(_ context.Context, observer api.Int64Observer) error {
 	m.ratesMutex.Lock()
 	defer m.ratesMutex.Unlock()
 	observer.Observe(m.avgMhPerSec)
+	return nil
+}
+
+func (m *Metrics) reportProviderFastestIngestRate(_ context.Context, observer api.Int64Observer) error {
+	m.ratesMutex.Lock()
+	defer m.ratesMutex.Unlock()
+	observer.Observe(m.fastestMhPerSec)
+	return nil
+}
+
+func (m *Metrics) reportProviderSlowestIngestRate(_ context.Context, observer api.Int64Observer) error {
+	m.ratesMutex.Lock()
+	defer m.ratesMutex.Unlock()
+	observer.Observe(m.slowestMhPerSec)
 	return nil
 }
 
