@@ -152,7 +152,7 @@ func (m *Metrics) Start(slowRate, nSlowest int) error {
 	); err != nil {
 		return err
 	}
-	if m.providerAvgIngestRate, err = meter.Int64ObservableGauge(
+	if m.providerSlowestIngestRate, err = meter.Int64ObservableGauge(
 		namePrefix+"provider_slowest_ingest_rate",
 		api.WithUnit("mh/sec"),
 		api.WithDescription("Slowest non-zero ingest rate"),
