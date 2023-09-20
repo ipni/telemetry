@@ -101,6 +101,7 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 			if _, ok := errored[update.ID]; !ok {
 				tel.metrics.NotifyProviderErrored(ctx, update.Err)
 				errored[update.ID] = update.Err
+				log.Infow("Provider marked as erroring", "provider", update.ID, "totalErroring", len(errored))
 				_, ok := rateMap[update.ID]
 				if ok {
 					delete(rateMap, update.ID)
@@ -112,6 +113,7 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 			if err, ok := errored[update.ID]; ok {
 				tel.metrics.NotifyProviderErrorCleared(ctx, err)
 				delete(errored, update.ID)
+				log.Infow("Provider error cleared", "provider", update.ID, "totalErroring", len(errored))
 			}
 			distSum = tel.updateDistBuckets(ctx, update.ID, int64(update.Distance), distSum)
 		}
