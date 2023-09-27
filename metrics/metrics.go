@@ -48,9 +48,6 @@ type Metrics struct {
 	fastestMhPerSec int64
 	slowestMhPerSec int64
 
-	nftMhPerSec int64
-	nftDist     int64
-
 	slowRates  []*IngestRate
 	slowCount  int
 	ratesMutex sync.Mutex
@@ -69,9 +66,6 @@ type Metrics struct {
 	providerSlowestIngestRate api.Int64ObservableGauge
 	providerSlowCount         api.Int64ObservableGauge
 	providerSlowIngestRate    api.Int64ObservableGauge
-
-	nftProviderIngestRate api.Int64ObservableGauge
-	nftProviderDistance   api.Int64ObservableGauge
 }
 
 func New(listenAddr string, pc *pcache.ProviderCache) *Metrics {
@@ -194,23 +188,6 @@ func (m *Metrics) Start(slowRate, nSlowest int) error {
 		return err
 	}
 
-	if m.nftProviderIngestRate, err = meter.Int64ObservableGauge(
-		namePrefix+"nft_provider_ingest_rate",
-		api.WithUnit("mh/sec"),
-		api.WithDescription("Ingest rate for NFT provider"),
-		api.WithInt64Callback(m.reportNFTProviderRate),
-	); err != nil {
-		return err
-	}
-	if m.nftProviderDistance, err = meter.Int64ObservableGauge(
-		namePrefix+"nft_provider_distance",
-		api.WithUnit("1"),
-		api.WithDescription("Distance for NFT provider"),
-		api.WithInt64Callback(m.reportNFTProviderDist),
-	); err != nil {
-		return err
-	}
-
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	m.server.Handler = mux
@@ -259,11 +236,6 @@ func (m *Metrics) UpdateIngestRates(slowRates []*IngestRate, slowCount int, avg,
 	m.avgMhPerSec = avg
 	m.fastestMhPerSec = fastest
 	m.slowestMhPerSec = slowest
-}
-
-func (m *Metrics) UpdateNFTInfo(mhPerSec, dist int64) {
-	m.nftMhPerSec = mhPerSec
-	m.nftDist = dist
 }
 
 func (m *Metrics) reportProviderCount(_ context.Context, observer api.Int64Observer) error {
@@ -326,16 +298,6 @@ func (m *Metrics) reportProviderSlowIngestRates(_ context.Context, observer api.
 		pidAttr := providerAttr(provRate.ProviderID)
 		observer.Observe(provRate.MhPerSec, api.WithAttributes(pidAttr))
 	}
-	return nil
-}
-
-func (m *Metrics) reportNFTProviderRate(_ context.Context, observer api.Int64Observer) error {
-	observer.Observe(m.nftMhPerSec)
-	return nil
-}
-
-func (m *Metrics) reportNFTProviderDist(_ context.Context, observer api.Int64Observer) error {
-	observer.Observe(m.nftDist)
 	return nil
 }
 
