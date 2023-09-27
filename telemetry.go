@@ -39,16 +39,6 @@ type Telemetry struct {
 	bucketIndexes map[peer.ID]int
 }
 
-var nftProviderID peer.ID
-
-func init() {
-	var err error
-	nftProviderID, err = peer.Decode("QmQzqxhK82kAmKvARFZSkUVS6fo9sySaiogAnx5EnZ6ZmC")
-	if err != nil {
-		panic(err.Error())
-	}
-}
-
 func New(adDepthLimit int64, updateIn, updateTo time.Duration, pc *pcache.ProviderCache, met *metrics.Metrics, indexerAdminURLs []string, slowRate, nSlowest int, topic string) (*Telemetry, error) {
 	indexerURLs := make([]*url.URL, len(indexerAdminURLs))
 	for i, urlStr := range indexerAdminURLs {
@@ -153,9 +143,6 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 		}
 		rateMap[update.ID] = ingestRate
 		tel.updateIngestRates(rateMap)
-		if update.ID == nftProviderID {
-			tel.metrics.UpdateNFTInfo(ingestRate.MhPerSec, int64(update.Distance))
-		}
 	}
 }
 
