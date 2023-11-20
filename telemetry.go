@@ -22,6 +22,9 @@ var log = logging.Logger("telemetry")
 // Number of buckest is 3: small, medium, large
 const nbuckets = 3
 
+// Time to clear any errors not cleared by update.
+const errorRefreshTime = 5 * time.Minute
+
 type Telemetry struct {
 	adDepthLimit int64
 	cancel       context.CancelFunc
@@ -91,6 +94,9 @@ func (tel *Telemetry) Close() {
 func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpdate) {
 	defer close(tel.done)
 
+	errTimer := time.NewTimer(errorRefreshTime)
+	defer errTimer.Stop()
+
 	errored := make(map[peer.ID]error)
 	rateMap := map[peer.ID]*metrics.IngestRate{}
 	var distSum int64
@@ -143,6 +149,25 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 		}
 		rateMap[update.ID] = ingestRate
 		tel.updateIngestRates(rateMap)
+
+		select {
+		case <-errTimer.C:
+			tel.refreshErrors(ctx, errored)
+			errTimer.Reset(errorRefreshTime)
+		default:
+		}
+	}
+}
+
+func (tel *Telemetry) refreshErrors(ctx context.Context, errored map[peer.ID]error) {
+	provs := tel.pcache.List()
+	for _, pinfo := range provs {
+		if pinfo.LastError == "" {
+			if err, ok := errored[pinfo.AddrInfo.ID]; ok {
+				tel.metrics.NotifyProviderErrorCleared(ctx, err)
+				delete(errored, pinfo.AddrInfo.ID)
+			}
+		}
 	}
 }
 
