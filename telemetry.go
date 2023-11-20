@@ -102,6 +102,13 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 	var distSum int64
 
 	for update := range updates {
+		select {
+		case <-errTimer.C:
+			tel.refreshErrors(ctx, errored)
+			errTimer.Reset(errorRefreshTime)
+		default:
+		}
+
 		if update.Err != nil {
 			log.Infow("Error getting distance", "provider", update.ID, "err", update.Err)
 			if prevErr, ok := errored[update.ID]; ok {
@@ -149,13 +156,6 @@ func (tel *Telemetry) run(ctx context.Context, updates <-chan dtrack.DistanceUpd
 		}
 		rateMap[update.ID] = ingestRate
 		tel.updateIngestRates(rateMap)
-
-		select {
-		case <-errTimer.C:
-			tel.refreshErrors(ctx, errored)
-			errTimer.Reset(errorRefreshTime)
-		default:
-		}
 	}
 }
 
