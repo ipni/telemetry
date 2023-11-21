@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipni/go-libipni v0.5.6
+	github.com/ipni/go-libipni v0.5.7
 	github.com/ipni/ipni-cli v0.1.6
 	github.com/libp2p/go-libp2p v0.32.1
 	github.com/prometheus/client_golang v1.16.0

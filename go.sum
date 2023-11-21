@@ -264,8 +264,8 @@ github.com/ipld/go-codec-dagpb v1.6.0 h1:9nYazfyu9B1p3NAgfVdpRco3Fs2nFC72DqVsMj6
 github.com/ipld/go-codec-dagpb v1.6.0/go.mod h1:ANzFhfP2uMJxRBr8CE+WQWs5UsNa0pYtmKZ+agnUw9s=
 github.com/ipld/go-ipld-prime v0.21.0 h1:n4JmcpOlPDIxBcY037SVfpd1G+Sj1nKZah0m6QH9C2E=
 github.com/ipld/go-ipld-prime v0.21.0/go.mod h1:3RLqy//ERg/y5oShXXdx5YIp50cFGOanyMctpPjsvxQ=
-github.com/ipni/go-libipni v0.5.6 h1:dg71WdPyUj25z7dR2EW/7hYO+8i+ZG/sBpYzWj4sy8s=
-github.com/ipni/go-libipni v0.5.6/go.mod h1:+S7MXdUoYyrKK37clglSJyzIV8AkQYG5TuMZhLIgJek=
+github.com/ipni/go-libipni v0.5.7 h1:6/JLZGfv3I54ArBKfS+k/ywOCntXtxMcD7qIf8+uexY=
+github.com/ipni/go-libipni v0.5.7/go.mod h1:+S7MXdUoYyrKK37clglSJyzIV8AkQYG5TuMZhLIgJek=
 github.com/ipni/ipni-cli v0.1.6 h1:T07rjNwUsn3kKVe4QdNLdLIyqNx75GjiRjqhXjywQ9w=
 github.com/ipni/ipni-cli v0.1.6/go.mod h1:D80+WdXQgvwlT2OVTxrCUIOMykS+CVDer/ShnX5DcuI=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=

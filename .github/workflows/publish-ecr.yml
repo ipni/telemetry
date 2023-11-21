@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - clear-errors
 
 jobs:
   publisher:
