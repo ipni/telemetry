@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/ipfs/go-log/v2 v2.5.1
-	github.com/ipni/go-libipni v0.5.7
-	github.com/ipni/ipni-cli v0.1.6
-	github.com/libp2p/go-libp2p v0.32.1
+	github.com/ipni/go-libipni v0.5.9
+	github.com/ipni/ipni-cli v0.1.9
+	github.com/libp2p/go-libp2p v0.32.2
 	github.com/prometheus/client_golang v1.16.0
 	go.opentelemetry.io/otel v1.18.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.41.0
@@ -96,7 +96,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
-	github.com/multiformats/go-multiaddr v0.12.0 // indirect
+	github.com/multiformats/go-multiaddr v0.12.1 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.2.0 // indirect
@@ -115,7 +115,7 @@ require (
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-20 v0.3.4 // indirect
-	github.com/quic-go/quic-go v0.39.3 // indirect
+	github.com/quic-go/quic-go v0.39.4 // indirect
 	github.com/quic-go/webtransport-go v0.6.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
