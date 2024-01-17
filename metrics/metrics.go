@@ -309,6 +309,10 @@ func errKindAttribute(err error) attribute.KeyValue {
 	// TODO check logs for other popular error kinds we might care about.
 	var errKind string
 	switch {
+	case strings.Contains(err.Error(), "failed to sync first entry"):
+		errKind = "cannot-fetch-any-entries"
+	case strings.Contains(err.Error(), "failed to sync entries"):
+		errKind = "fetch-some-entries-failed"
 	case strings.Contains(err.Error(), "timed out waiting"):
 		errKind = "timed-out-waiting"
 	case strings.Contains(err.Error(), "response rejected"):
